@@ -10,6 +10,8 @@ from rest_framework import serializers
 from rest_framework.permissions import IsAuthenticated
 import threading
 import random
+import json
+
 class ProductSearializer(serializers.ModelSerializer):
     class Meta:
         model = Product
@@ -21,7 +23,6 @@ class HomeView(APIView):
     def get(self, request):
         product = Product.objects.all()
         product_data = ProductSearializer(product, many=True)
-
         return render(request, 'home.html', context={'data': product_data.data})
     
     def post(self, request):
@@ -50,6 +51,8 @@ class HomeView(APIView):
             ).save()
         
 class ProductView(APIView):
+    # permission_classes = (IsAuthenticated,)
+
     def get(self, request, pk=None):
         if pk:
             product = Product.objects.get(id=pk)
@@ -60,22 +63,25 @@ class ProductView(APIView):
         return Response(product_data.data, status=status.HTTP_200_OK)
     
     def post(self, request):
-        category_id = request.data.get('category_id')
-        title = request.data.get('title')
-        description = request.data.get('description')
-        price = request.data.get('price')
-        status = request.data.get('status')
+        try:
+            category_id = request.data.get('category_id')
+            title = request.data.get('title')
+            description = request.data.get('description')
+            price = request.data.get('price')
+            status = request.data.get('status')
 
-        category = Category.objects.get(id=category_id)
-        product = Product.objects.create(
-                    category_id = category,
-                    title = title,
-                    description = description,
-                    price = price,
-                    status = status
-                )
-        product.save()
-        return Response({"Message": "Product created successfully."})
+            category = Category.objects.get(id=category_id)
+            product = Product.objects.create(
+                        category_id = category,
+                        title = title,
+                        description = description,
+                        price = price,
+                        status = status
+                    )
+            product.save()
+            return Response({"Message": "Product created successfully."})
+        except:
+            return Response({"Message": "Error Found"})
     
     def put(self, request, pk):
         try:
