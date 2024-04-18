@@ -8,8 +8,8 @@ from application.models import Product, Category
 import faker_commerce
 from rest_framework import serializers
 from rest_framework.permissions import IsAuthenticated
-   
-
+import threading
+import random
 class ProductSearializer(serializers.ModelSerializer):
     class Meta:
         model = Product
@@ -28,20 +28,26 @@ class HomeView(APIView):
         try:
             rows = request.data.get('product_row')
             print("rows", type(rows))
-            for _ in range(int(rows)):
-                print("rows", _)
-                category = Category.objects.get(id=int(self.faker.random_number(1)))
-                Product.objects.create(
-                    category_id = category,
-                    title = faker_commerce.PRODUCT_DATA['product'][self.faker.random_number(1)],
-                    description = self.faker.text(),
-                    price = int(self.faker.random_number(5)),
-                    status = int(self.faker.pybool())
-                ).save()
+            thread = threading.Thread(target=self.background_process(rows), args=(), kwargs={})
+            thread.setDaemon(True)
+            thread.start()
             return redirect('/')
         except Exception as e:
             print("Error : ", e)
             return Response("Error Found : ", status=status.HTTP_400_BAD_REQUEST)
+    
+    def background_process(self, rows):
+        for _ in range(int(rows)):
+            # category = Category.objects.get(id=int(self.faker.random_number(1)))
+            categorys = list(Category.objects.all())
+            category = random.sample(categorys, 1)[0]
+            Product.objects.create(
+                category_id = category,
+                title = faker_commerce.PRODUCT_DATA['product'][self.faker.random_number(1)],
+                description = self.faker.text(),
+                price = int(self.faker.random_number(5)),
+                status = int(self.faker.pybool())
+            ).save()
         
 class ProductView(APIView):
     def get(self, request, pk=None):
