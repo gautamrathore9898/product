@@ -11,15 +11,40 @@ from rest_framework.permissions import IsAuthenticated
 import threading
 import random
 import json
+from celery import shared_task
+from django.db import transaction
+
+faker = Faker()
+
 
 class ProductSearializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = '__all__'
+  
+    
+@shared_task
+def background_process(rows):
+    try:
+        with transaction.atomic():
+            for _ in range(int(rows)):
+                categorys = list(Category.objects.all())
+                category = random.choice(categorys)
+                Product.objects.create(
+                    category_id = category,
+                    title = faker_commerce.PRODUCT_DATA['product'][faker.random_number(1)],
+                    description = faker.text(),
+                    price = int(faker.random_number(5)),
+                    status = int(faker.pybool())
+                ).save()
+        return True
+    except Exception as e:
+        print("Error:", e)
+        return False
 
 class HomeView(APIView):
     # permission_classes = (IsAuthenticated,)
-    faker = Faker()
+   
     def get(self, request):
         product = Product.objects.all()
         product_data = ProductSearializer(product, many=True)
@@ -28,27 +53,40 @@ class HomeView(APIView):
     def post(self, request):
         try:
             rows = request.data.get('product_row')
-            print("rows", type(rows))
-            thread = threading.Thread(target=self.background_process(rows), args=(), kwargs={})
-            thread.setDaemon(True)
-            thread.start()
-            return redirect('/')
+            print("rows", rows)
+            if rows:
+                background_process(rows)
+            
+                # thread = threading.Thread(target=self.background_process(rows), args=(), kwargs={})
+                # thread.setDaemon(True)
+                # thread.start()
+                return redirect('/', status=status.HTTP_201_CREATED)
+            else:
+                return Response("Error Found  : No product_row parameter passed. ", status=status.HTTP_400_BAD_REQUEST)
+                
+        
         except Exception as e:
             print("Error : ", e)
             return Response("Error Found : ", status=status.HTTP_400_BAD_REQUEST)
-    
-    def background_process(self, rows):
-        for _ in range(int(rows)):
-            # category = Category.objects.get(id=int(self.faker.random_number(1)))
-            categorys = list(Category.objects.all())
-            category = random.sample(categorys, 1)[0]
-            Product.objects.create(
-                category_id = category,
-                title = faker_commerce.PRODUCT_DATA['product'][self.faker.random_number(1)],
-                description = self.faker.text(),
-                price = int(self.faker.random_number(5)),
-                status = int(self.faker.pybool())
-            ).save()
+       
+    # @shared_task
+    # def background_process(self, rows):
+    #     try:
+    #         with transaction.atomic():
+    #             for _ in range(int(rows)):
+    #                 categorys = list(Category.objects.all())
+    #                 category = random.sample(categorys, 1)[0]
+    #                 Product.objects.create(
+    #                     category_id = category,
+    #                     title = faker_commerce.PRODUCT_DATA['product'][self.faker.random_number(1)],
+    #                     description = self.faker.text(),
+    #                     price = int(self.faker.random_number(5)),
+    #                     status = int(self.faker.pybool())
+    #                 ).save()
+    #         return True
+    #     except Exception as e:
+    #         print("Error:", e)
+    #         return False
         
 class ProductView(APIView):
     # permission_classes = (IsAuthenticated,)
